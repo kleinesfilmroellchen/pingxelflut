@@ -1,4 +1,4 @@
-//! Common backend of the Pingxelflut client and server. 
+//! Common backend of the Pingxelflut client and server.
 
 use socket2::{Domain, Protocol, Socket, Type};
 use std::{
