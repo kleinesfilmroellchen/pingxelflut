@@ -146,7 +146,7 @@ pub(crate) fn read_first_icmp_packet_with_type(
     socket: &mut Socket,
     receive_type: u8,
 ) -> Result<Vec<u8>, io::Error> {
-    Ok(read_icmp_packets_until(socket, |buffer| {
+    read_icmp_packets_until(socket, |buffer| {
         buffer.starts_with(&[0, 0]) && buffer.get(8).is_some_and(|v| *v == receive_type)
-    })?)
+    })
 }

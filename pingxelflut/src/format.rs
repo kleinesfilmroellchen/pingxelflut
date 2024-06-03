@@ -92,21 +92,43 @@ impl Color {
     /// Create a color struct from three (RGB) or four (RGBA) bytes.
     ///
     /// [`None`] is returned if the input bytes are not exactly 3 or 4 in length.
-    pub fn from_bytes(bytes: &[u8]) -> Option<Color> {
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         match bytes {
-            [red, green, blue] => Some(Color {
+            [red, green, blue] => Some(Self {
                 red: *red,
                 green: *green,
                 blue: *blue,
                 alpha: None,
             }),
-            [red, green, blue, alpha] => Some(Color {
+            [red, green, blue, alpha] => Some(Self {
                 red: *red,
                 green: *green,
                 blue: *blue,
                 alpha: Some(*alpha),
             }),
             _ => None,
+        }
+    }
+
+    /// Create a color struct from three RGB bytes.
+    #[inline]
+    pub fn from_rgb([red, green, blue]: [u8; 3]) -> Self {
+        Self {
+            red,
+            green,
+            blue,
+            alpha: None,
+        }
+    }
+
+    /// Create a color struct from four RGBA bytes.
+    #[inline]
+    pub fn from_rgba([red, green, blue, alpha]: [u8; 4]) -> Self {
+        Self {
+            red,
+            green,
+            blue,
+            alpha: Some(alpha),
         }
     }
 
