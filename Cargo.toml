@@ -1,0 +1,8 @@
+[workspace]
+members = ["client", "server", "pingxelflut"]
+package.authors = ["kleines Filmröllchen <filmroellchen@serenityos.org>"]
+package.version = "0.1.0"
+package.rust-version = "1.79"
+package.edition = "2021"
+
+resolver = "2"

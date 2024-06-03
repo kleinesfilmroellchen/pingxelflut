@@ -1,0 +1,71 @@
+# pingxelflut
+
+Pixelflut, but with ICMP.
+
+## Reference implementation structure
+
+The reference implementation is split up into three Rust crates:
+
+- `pingxelflut`: Common data structures and utilities for writing Rust pingxelflut implementations. May be published to crates.io at some point.
+- `client`: (WIP) Simple client implementation.
+- `server`: (WIP) Simple server implementation (Linux-only).
+
+## Known Implementations
+
+Please open a PR to add your implementation!
+
+## Protocol
+
+[RFC 2119 keywords](https://www.rfc-editor.org/rfc/rfc2119) are used in the following and MUST be interpreted accordingly.
+
+The pingxelflut protocol is a layer 5 protocol based on [ICMP (RFC 792)](https://www.rfc-editor.org/rfc/rfc792) and any implementation MUST follow ICMP protocol requirements.
+
+Messages to the server are sent as Echo Request packets (ICMP type 8 code 0, ICMPv6 type 128), messages to the client are sent as Echo Reply (ICMP type 0 code 0, ICMPv6 type 129).
+
+The first four bytes of the payload are to be used according to Echo conventions. The first 16-bit word specifies the Echo request identifier, and the second 16-bit word specifies the Echo request sequence number. The identifier MUST be ignored. The sequence number of consecutive packets SHOULD be increasing.
+
+The fifth byte of the payload specifies the packet type.
+
+| Byte | Type          | Direction |
+| ---- | ------------- | --------- |
+| aa   | Size request  | To Server |
+| bb   | Size response | To Client |
+| cc   | Set pixel     | To Server |
+
+All multi-byte values are in network order (big endian). (Since the color bytes are defined individually below, their byte order is RGB(A) and not BGR or else.)
+
+Byte numbers in the following refer to the byte indices after the packet type byte.
+
+### Size request
+
+The size request packet contains no further data. The server responds with a size response packet. Size request packets MAY be rate-limited.
+
+### Size response
+
+The size response packet contains the server’s canvas size as two unsigned 16-bit integers.
+
+| Bytes | Value  |
+| ----- | ------ |
+| 0-1   | Width  |
+| 2-3   | Height |
+
+### Set pixel
+
+The set pixel packet contains an X and Y position to set a pixel at, plus an RGB(A) color to set. The coordinates are unsigned 16-bit integers, and the origin is in the top left corner of the image. The alpha value is optional.
+
+| Bytes | Value            |
+| ----- | ---------------- |
+| 0-1   | X position       |
+| 2-3   | Y position       |
+| 4     | Red              |
+| 5     | Green            |
+| 6     | Blue             |
+| 7     | Alpha (optional) |
+
+The set pixel packet has no response.
+
+### Invalid data handling recommendations
+
+- Servers SHOULD silently discard pixel setting requests that fall outside the defined canvas. They MAY wrap pixel setting requests at the image borders (`x mod width` and `y mod height`).
+- Since many systems can’t prevent default responses from ICMP Echo Request packets, any packet type that is invalid for its direction MUST be discarded by either side and not treated as an error.
+- Any other kind of generally malformatted data MUST be discarded silently. Clients SHOULD warn the user about such events, for example to aid in debugging server implementations and raising issues with servers run at large events.

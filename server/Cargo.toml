@@ -1,0 +1,9 @@
+[package]
+name = "server"
+description = "Simple pingxelflut server"
+version.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+
+[dependencies]
