@@ -9,3 +9,6 @@ edition.workspace = true
 [dependencies]
 socket2 = { version = "0.5.7", features = ["all"] }
 pingxelflut = { path = "../pingxelflut" }
+clap = { version = "4.5.4", features = ["derive"] }
+image = { version = "0.25.1", features = ["qoi"] }
+anyhow = "1.0.86"

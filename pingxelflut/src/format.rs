@@ -14,6 +14,10 @@ pub enum Packet {
 }
 
 impl Packet {
+    pub const SIZE_REQUEST_ID: u8 = 0xaa;
+    pub const SIZE_RESPONSE_ID: u8 = 0xbb;
+    pub const SET_PIXEL_ID: u8 = 0xcc;
+
     /// Parse a packet from the start of the provided binary representation.
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         let kind = bytes[0];
@@ -43,23 +47,31 @@ impl Packet {
     pub fn write_to(&self, buffer: &mut [u8]) -> usize {
         match self {
             Packet::SizeRequest => {
-                buffer[0] = 0xaa;
+                buffer[0] = Self::SIZE_REQUEST_ID;
                 1
             }
             Packet::SizeResponse { width, height } => {
-                buffer[0] = 0xbb;
+                buffer[0] = Self::SIZE_RESPONSE_ID;
                 buffer[1..=2].copy_from_slice(&width.to_be_bytes());
                 buffer[3..=4].copy_from_slice(&height.to_be_bytes());
                 5
             }
             Packet::SetPixel { x, y, color } => {
-                buffer[0] = 0xcc;
+                buffer[0] = Self::SET_PIXEL_ID;
                 buffer[1..=2].copy_from_slice(&x.to_be_bytes());
                 buffer[3..=4].copy_from_slice(&y.to_be_bytes());
                 let color_size = color.write_to(&mut buffer[5..]);
                 5 + color_size
             }
         }
+    }
+
+    /// Convert the packet to its byte representation.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut buffer = vec![0; 9];
+        let length = self.write_to(&mut buffer);
+        buffer.truncate(length);
+        buffer
     }
 }
 

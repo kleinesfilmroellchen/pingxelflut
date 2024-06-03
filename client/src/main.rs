@@ -1,14 +1,31 @@
 use std::net::IpAddr;
-use std::net::Ipv4Addr;
-use std::net::SocketAddr;
+use std::path::PathBuf;
 
-use pingxelflut::Icmp;
+use anyhow::Result;
+use clap::Parser;
+use pingxelflut::get_size;
 
-fn main() {
-    let mut echo = Icmp::new(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0).to_owned(),
-        28,
-    );
-    echo.set_payload(vec![1, 2, 3, 4]);
-    println!("{:?}", echo.send().unwrap());
+/// A simple Pingxelflut client.
+#[derive(Clone, Parser, Debug)]
+struct Arguments {
+    /// Target server to send pixels to.
+    #[arg(short, long, value_name = "ADDRESS")]
+    target: IpAddr,
+    /// Source image to send.
+    #[arg(short, long, value_name = "IMAGE")]
+    image: PathBuf,
+    /// X offset to send image at.
+    #[arg(short, value_name = "X", default_value = "0")]
+    x: u16,
+    /// Y offset to send image at.
+    #[arg(short, value_name = "Y", default_value = "0")]
+    y: u16,
+}
+
+fn main() -> Result<()> {
+    let arguments: Arguments = Parser::parse();
+    let image = image::open(arguments.image)?;
+    let size = get_size(arguments.target)?;
+
+    Ok(())
 }
