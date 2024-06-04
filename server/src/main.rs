@@ -10,13 +10,14 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use canvas::{to_internal_color, Canvas};
-use etherparse::{Icmpv4Type, NetSlice, SlicedPacket, TransportSlice};
+use etherparse::{Icmpv4Type, Icmpv6Type, NetSlice, SlicedPacket, TransportSlice};
 use futures::{Future, StreamExt};
 use log::{error, warn};
 use parking_lot::RwLock;
 use pcap::{Capture, Device, PacketCodec};
 use pingxelflut::format::Packet;
 use pingxelflut::icmp::{EchoDirection, Icmp};
+use pixels::wgpu::Color;
 use pixels::{Pixels, SurfaceTexture};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -43,17 +44,18 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_attributes = Window::default_attributes()
             .with_title("Pingxelflut")
-            .with_inner_size(winit::dpi::LogicalSize::new(WIDTH, HEIGHT));
+            .with_inner_size(winit::dpi::PhysicalSize::new(WIDTH, HEIGHT));
 
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
         self.window_id = Some(window.id());
         self.window = Some(window.clone());
 
         let window = self.window.as_ref().unwrap().clone();
-        let pixels = {
+        let mut pixels = {
             let surface_texture = SurfaceTexture::new(WIDTH, HEIGHT, &window);
             Pixels::new(WIDTH, HEIGHT, surface_texture).unwrap()
         };
+        pixels.clear_color(Color::BLACK);
         self.pixels = Some(Arc::new(RwLock::new(pixels)));
 
         let canvas = Canvas {
@@ -140,9 +142,15 @@ impl PacketCodec for PingxelflutPacketStream {
                     _ => None,
                 }
             }
-            TransportSlice::Icmpv6(_data) => {
-                warn!("ICMPv6 not yet supported");
-                None
+            TransportSlice::Icmpv6(data) => {
+                let payload = data.payload();
+                let packet_type = data.icmp_type();
+                match packet_type {
+                    Icmpv6Type::EchoRequest(_) => {
+                        Packet::from_bytes(payload).map(|p| (p, destination_address))
+                    }
+                    _ => None,
+                }
             }
             _ => None,
         }
@@ -157,8 +165,7 @@ async fn device_ping_handler(mut canvas: Canvas, device: Device) -> Result<()> {
         .open()?
         .setnonblock()?;
 
-    // FIXME: support ICMPv6 by changing the filter to "icmp or icmp6"
-    capture.filter("icmp", false)?;
+    capture.filter("icmp or icmp6", false)?;
     let stream = capture.stream(PingxelflutPacketStream)?;
 
     stream
