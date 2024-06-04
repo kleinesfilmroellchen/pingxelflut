@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use canvas::{to_internal_color, Canvas};
+use concurrent_queue::ConcurrentQueue;
 use etherparse::{Icmpv4Type, Icmpv6Type, NetSlice, SlicedPacket, TransportSlice};
 use futures::{Future, StreamExt};
 use log::{error, warn};
@@ -24,14 +25,15 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::{Window, WindowId};
 
-const WIDTH: u32 = 320;
-const HEIGHT: u32 = 240;
+const WIDTH: u32 = 1920;
+const HEIGHT: u32 = 1080;
 
 #[derive(Default)]
 struct App {
     window_id: Option<WindowId>,
     window: Option<Arc<Window>>,
     pixels: Option<Arc<RwLock<Pixels>>>,
+    canvas: Option<Canvas>,
 }
 
 impl ApplicationHandler for App {
@@ -62,7 +64,9 @@ impl ApplicationHandler for App {
             width: WIDTH as u16,
             height: HEIGHT as u16,
             pixels: self.pixels.as_ref().unwrap().clone(),
+            pixel_queue: Arc::new(ConcurrentQueue::unbounded()),
         };
+        self.canvas = Some(canvas.clone());
         tokio::spawn(async move {
             ping_handler(canvas).await;
         });
@@ -92,6 +96,7 @@ impl ApplicationHandler for App {
                 self.window = None;
             }
             WindowEvent::RedrawRequested => {
+                self.canvas.as_mut().unwrap().set_queue_pixels();
                 if let Err(err) = self.pixels.as_ref().unwrap().read().render() {
                     error!("pixels.render: {}", err);
                     event_loop.exit();
@@ -159,48 +164,51 @@ impl PacketCodec for PingxelflutPacketStream {
 
 async fn device_ping_handler(mut canvas: Canvas, device: Device) -> Result<()> {
     let mut capture = Capture::from_device(device)?
-        .immediate_mode(true)
-        .promisc(true)
-        .snaplen(512)
-        .buffer_size(1 << 20)
+        // .immediate_mode(true)
+        // .promisc(true)
+        .snaplen(128)
+        .buffer_size(1 << 31)
         .open()?
         .setnonblock()?;
 
-    capture.filter("icmp or icmp6", false)?;
+    capture.filter("icmp or icmp6", true)?;
     let stream = capture.stream(PingxelflutPacketStream)?;
 
     stream
-        .for_each_concurrent(None, move |maybe_packet| {
-            if let Ok(Some((packet, target_addr))) = maybe_packet {
-                match packet {
-                    Packet::SizeRequest => {
-                        // TODO: Figure out if the identifier is important for getting the packet delivered.
-                        let mut response =
-                            Icmp::new(SocketAddr::new(target_addr, 0), 0, EchoDirection::Reply);
-                        response.set_payload(
-                            Packet::SizeResponse {
-                                width: WIDTH as u16,
-                                height: HEIGHT as u16,
-                            }
-                            .to_bytes(),
-                        );
-                        let result = response.send();
-                        match result {
-                            Ok(mut socket) => {
-                                let _ = socket.flush();
-                            }
-                            Err(why) => {
-                                warn!("size response error: {}", why)
+        .for_each(move |maybe_packet| {
+            let mut canvas = canvas.clone();
+            tokio::spawn(async move {
+                if let Ok(Some((packet, target_addr))) = maybe_packet {
+                    match packet {
+                        Packet::SizeRequest => {
+                            // TODO: Figure out if the identifier is important for getting the packet delivered.
+                            let mut response =
+                                Icmp::new(SocketAddr::new(target_addr, 0), 0, EchoDirection::Reply);
+                            response.set_payload(
+                                Packet::SizeResponse {
+                                    width: WIDTH as u16,
+                                    height: HEIGHT as u16,
+                                }
+                                .to_bytes(),
+                            );
+                            let result = response.send();
+                            match result {
+                                Ok(_) => {
+                                    // let _ = socket.flush();
+                                }
+                                Err(why) => {
+                                    warn!("size response error: {}", why)
+                                }
                             }
                         }
-                    }
-                    // ignore
-                    Packet::SizeResponse { .. } => {}
-                    Packet::SetPixel { x, y, color } => {
-                        canvas.set_pixel(x, y, to_internal_color(color));
+                        // ignore
+                        Packet::SizeResponse { .. } => {}
+                        Packet::SetPixel { x, y, color } => {
+                            canvas.set_pixel(x, y, to_internal_color(color));
+                        }
                     }
                 }
-            }
+            });
             futures::future::ready(())
         })
         .await;
