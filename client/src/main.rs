@@ -57,9 +57,9 @@ fn send_pixel_from_image(
 fn main() -> Result<()> {
     let arguments: Arguments = Parser::parse();
     let mut image = image::open(arguments.image)?;
-    let (width, height) = get_size(arguments.target)?;
-    // let width = 1920u16;
-    // let height = 1080u16;
+    // let (width, height) = get_size(arguments.target)?;
+    let width = 1920u16;
+    let height = 1080u16;
 
     image = image.crop_imm(
         0,

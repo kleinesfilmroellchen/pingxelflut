@@ -4,14 +4,26 @@ use std::{
     net::SocketAddr,
 };
 
-const HEADER_SIZE: usize = 8;
-const ECHO_V4: u8 = 8;
-const ECHO_V6: u8 = 128;
+/// Includes both the real header (4 bytes) as well as the echo standard data (4 bytes).
+pub const ICMP_HEADER_SIZE: usize = 8;
+pub const IPV4_HEADER_SIZE: usize = 20;
+pub const ECHO_REQUEST_V4: u8 = 8;
+pub const ECHO_REQUEST_V6: u8 = 128;
+pub const ECHO_REPLY_V4: u8 = 0;
+pub const ECHO_REPLY_V6: u8 = 129;
+
+/// The two kinds of echo packets, request and reply.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum EchoDirection {
+    Request,
+    Reply,
+}
 
 /// An ICMP v4/v6 Echo Request packet.
 /// Provides functionality to send out Echo Request messages (pings) and capture their response.
 // TODO: ICMPv6 is not implemented yet.
 pub struct Icmp {
+    direction: EchoDirection,
     /// Ping identifier, part of the standard payload.
     identifier: u16,
     /// Target address.
@@ -29,11 +41,13 @@ impl Icmp {
     ///
     /// - `target`: The target address of the ping.
     /// - `identifier`: The identifier of the ping.
-    pub fn new(target: SocketAddr, identifier: u16) -> Self {
+    /// - `direction`: The echo direction, i.e. an echo request or reply.
+    pub fn new(target: SocketAddr, identifier: u16, direction: EchoDirection) -> Self {
         Icmp {
+            direction,
             identifier,
             target,
-            packet: [0; HEADER_SIZE].to_vec(),
+            packet: [0; ICMP_HEADER_SIZE].to_vec(),
             payload: Vec::new(),
             current_sequence_number: 0,
         }
@@ -67,12 +81,13 @@ impl Icmp {
 
     /// Encode this packet’s data.
     fn encode(&mut self) {
-        self.packet.truncate(8);
-        if self.target.is_ipv4() {
-            self.packet[0] = ECHO_V4;
-        } else {
-            self.packet[0] = ECHO_V6;
-        }
+        self.packet.truncate(ICMP_HEADER_SIZE);
+        self.packet[0] = match (self.target.is_ipv4(), self.direction) {
+            (true, EchoDirection::Request) => ECHO_REQUEST_V4,
+            (true, EchoDirection::Reply) => ECHO_REPLY_V4,
+            (false, EchoDirection::Request) => ECHO_REQUEST_V6,
+            (false, EchoDirection::Reply) => ECHO_REPLY_V6,
+        };
 
         self.packet[1] = 0;
         self.packet[4] = (self.identifier >> 8) as u8;
@@ -129,8 +144,8 @@ pub(crate) fn read_icmp_packets_until(
             },
             Ok(size) => {
                 // FIXME: only works on IPv4
-                last_packet.resize(size - 20, 0);
-                last_packet.copy_from_slice(&buffer[20..size]);
+                last_packet.resize(size - IPV4_HEADER_SIZE, 0);
+                last_packet.copy_from_slice(&buffer[IPV4_HEADER_SIZE..size]);
                 println!("packet {:?}", last_packet);
                 if condition(&last_packet) {
                     break;
@@ -146,7 +161,8 @@ pub(crate) fn read_first_icmp_packet_with_type(
     socket: &mut Socket,
     receive_type: u8,
 ) -> Result<Vec<u8>, io::Error> {
+    // FIXME: use etherparse to more robustly read the packet type.
     read_icmp_packets_until(socket, |buffer| {
-        buffer.starts_with(&[0, 0]) && buffer.get(8).is_some_and(|v| *v == receive_type)
+        buffer.starts_with(&[ECHO_REPLY_V4, 0]) && buffer.get(8).is_some_and(|v| *v == receive_type)
     })
 }
