@@ -162,6 +162,7 @@ async fn device_ping_handler(mut canvas: Canvas, device: Device) -> Result<()> {
         .immediate_mode(true)
         .promisc(true)
         .snaplen(512)
+        .buffer_size(1 << 20)
         .open()?
         .setnonblock()?;
 

@@ -12,3 +12,4 @@ pingxelflut = { path = "../pingxelflut" }
 clap = { version = "4.5.4", features = ["derive"] }
 image = { version = "0.25.1", features = ["qoi"] }
 anyhow = "1.0.86"
+rayon = "1.10.0"

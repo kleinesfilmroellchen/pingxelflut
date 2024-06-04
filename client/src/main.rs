@@ -1,5 +1,6 @@
 use std::net::IpAddr;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use anyhow::Result;
 use clap::Parser;
@@ -9,6 +10,8 @@ use image::Pixel;
 use pingxelflut::format::Color;
 use pingxelflut::get_size;
 use pingxelflut::set_pixel;
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
 
 /// A simple Pingxelflut client.
 #[derive(Clone, Parser, Debug)]
@@ -29,11 +32,11 @@ struct Arguments {
 
 /// Check whether an image has transparency.
 fn image_has_transparency(image: &DynamicImage) -> bool {
-    image.as_rgb8().is_none()
-        || image.as_luma8().is_none()
-        || image.as_rgb16().is_none()
-        || image.as_rgb32f().is_none()
-        || image.as_luma16().is_none()
+    image.as_rgba8().is_some()
+        || image.as_luma_alpha16().is_some()
+        || image.as_rgba16().is_some()
+        || image.as_rgba32f().is_some()
+        || image.as_luma_alpha8().is_some()
 }
 
 fn send_pixel_from_image(
@@ -58,6 +61,8 @@ fn main() -> Result<()> {
     let arguments: Arguments = Parser::parse();
     let mut image = image::open(arguments.image)?;
     let (width, height) = get_size(arguments.target)?;
+    // let width = 320u16;
+    // let height = 200u16;
 
     image = image.crop_imm(
         0,
@@ -68,7 +73,7 @@ fn main() -> Result<()> {
     let has_transparency = image_has_transparency(&image);
 
     loop {
-        for x in 0..(image.width() as u16) {
+        (0..(image.width() as u16)).into_par_iter().for_each(|x| {
             for y in 0..(image.height() as u16) {
                 let result =
                     send_pixel_from_image(&image, arguments.target, has_transparency, x, y);
@@ -76,6 +81,6 @@ fn main() -> Result<()> {
                     eprintln!("error while sending pixel: {:?}", err);
                 }
             }
-        }
+        });
     }
 }
