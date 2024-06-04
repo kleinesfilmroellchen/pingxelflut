@@ -1,7 +1,6 @@
 //! Common backend of the Pingxelflut client and server.
 
 use std::io;
-use std::io::Write;
 use std::net::IpAddr;
 use std::net::SocketAddr;
 
@@ -40,7 +39,6 @@ pub fn set_pixel(target: IpAddr, x: u16, y: u16, color: Color) -> Result<(), io:
         EchoDirection::Request,
     );
     set_request.set_payload(Packet::SetPixel { x, y, color }.to_bytes());
-    let mut socket = set_request.send()?;
-    socket.flush()?;
+    set_request.send()?;
     Ok(())
 }

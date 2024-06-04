@@ -26,7 +26,7 @@ impl Canvas {
             return;
         }
         let pixel_pos = (x + y * self.width as usize) * COLOR_SIZE;
-        let pixel_end_pos = pixel_pos + COLOR_SIZE as usize;
+        let pixel_end_pos = pixel_pos + COLOR_SIZE;
         {
             let mut pixels = self.pixels.write();
             pixels.frame_mut()[pixel_pos..pixel_end_pos].copy_from_slice(color.as_ref());

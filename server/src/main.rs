@@ -10,7 +10,6 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use canvas::{to_internal_color, Canvas};
-use env_logger;
 use etherparse::{Icmpv4Type, NetSlice, SlicedPacket, TransportSlice};
 use futures::{Future, StreamExt};
 use log::{error, warn};
@@ -94,7 +93,6 @@ impl ApplicationHandler for App {
                 if let Err(err) = self.pixels.as_ref().unwrap().read().render() {
                     error!("pixels.render: {}", err);
                     event_loop.exit();
-                    return;
                 }
             }
             _ => (),
@@ -163,8 +161,6 @@ async fn device_ping_handler(mut canvas: Canvas, device: Device) -> Result<()> {
     capture.filter("icmp", false)?;
     let stream = capture.stream(PingxelflutPacketStream)?;
 
-    // let capture = Arc::new(Mutex::new(capture));
-
     stream
         .for_each_concurrent(None, move |maybe_packet| {
             if let Ok(Some((packet, target_addr))) = maybe_packet {
@@ -173,6 +169,13 @@ async fn device_ping_handler(mut canvas: Canvas, device: Device) -> Result<()> {
                         // TODO: Figure out if the identifier is important for getting the packet delivered.
                         let mut response =
                             Icmp::new(SocketAddr::new(target_addr, 0), 0, EchoDirection::Reply);
+                        response.set_payload(
+                            Packet::SizeResponse {
+                                width: WIDTH as u16,
+                                height: HEIGHT as u16,
+                            }
+                            .to_bytes(),
+                        );
                         let result = response.send();
                         match result {
                             Ok(mut socket) => {
@@ -190,8 +193,6 @@ async fn device_ping_handler(mut canvas: Canvas, device: Device) -> Result<()> {
                     }
                 }
             }
-            // stream.capture_mut().sendpacket([1,2,3,4]);
-            // capture.sendpacket([1,2,3,4]);
             futures::future::ready(())
         })
         .await;
