@@ -27,6 +27,11 @@ struct Arguments {
     /// Y offset to send image at.
     #[arg(short, value_name = "Y", default_value = "0")]
     y: u16,
+    /// Whether to request the canvas size prior to sending.
+    /// This may make the client work better via localhost and on Windows.
+    /// By default, 1920x1080 is used.
+    #[arg(long)]
+    no_request_size: bool,
 }
 
 /// Check whether an image has transparency.
@@ -59,9 +64,11 @@ fn send_pixel_from_image(
 fn main() -> Result<()> {
     let arguments: Arguments = Parser::parse();
     let mut image = image::open(arguments.image)?;
-    let (width, height) = get_size(arguments.target)?;
-    // let width = 320u16;
-    // let height = 200u16;
+    let (width, height) = if arguments.no_request_size {
+        (1920u16, 1080u16)
+    } else {
+        get_size(arguments.target)?
+    };
 
     image = image.crop_imm(
         0,
