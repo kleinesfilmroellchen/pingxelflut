@@ -7,8 +7,31 @@ Pixelflut, but with ICMP.
 The reference implementation is split up into three Rust crates:
 
 - `pingxelflut`: Common data structures and utilities for writing Rust pingxelflut implementations. May be published to crates.io at some point.
-- `client`: (WIP) Simple client implementation.
-- `server`: (WIP) Simple server implementation (Linux-only).
+- `client`: Simple client implementation.
+- `server`: Reasonably performant server implementation.
+
+### Development and Usage
+
+#### `client`
+
+The client has a few options controlling how and where to send images, see its `--help` output. It needs to be able to open raw sockets, which requires the `cap_net_raw` capability on Linux. (Alternatively, run it as root.)
+
+> ![WARNING]
+> Currently, the client does not properly work on Windows: **It crashes your system**. The root cause of this issue is not know, since the client can seemingly send packets over raw sockets just fine. Additionally, it cannot receive more than one echo reply, meaning that requesting the canvas size does not work.
+
+### `server`
+
+The server does not have any options currently. It opens a window displaying the pingxelflut canvas; closing the window ends the application. It uses `libpcap` to detect ICMP packets, so the corresponding libraries must be installed; refer to your package manager of choice or install `Npcap` on Windows. The server needs the raw socket capabilities in addition to pcap permissions, so `cap_net_raw,cap_net_admin` seems to be required for Linux capabilities. (It doesn’t seem to be possible to run the server as root due to it interacting with the windowing system.)
+
+> ![NOTE]
+> The server is not tested on Windows.
+
+For development, this command chain seems to be useful:
+
+```shell
+# in the `server` directory
+cargo build --release && sudo setcap cap_net_raw,cap_net_admin=eip ../target/release/server && ../target/release/server
+```
 
 ## Known Implementations
 

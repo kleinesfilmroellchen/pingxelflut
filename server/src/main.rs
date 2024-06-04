@@ -4,7 +4,6 @@
 
 mod canvas;
 
-use std::io::Write;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
@@ -162,10 +161,8 @@ impl PacketCodec for PingxelflutPacketStream {
     }
 }
 
-async fn device_ping_handler(mut canvas: Canvas, device: Device) -> Result<()> {
+async fn device_ping_handler(canvas: Canvas, device: Device) -> Result<()> {
     let mut capture = Capture::from_device(device)?
-        // .immediate_mode(true)
-        // .promisc(true)
         .snaplen(128)
         .buffer_size(1 << 31)
         .open()?
@@ -193,9 +190,7 @@ async fn device_ping_handler(mut canvas: Canvas, device: Device) -> Result<()> {
                             );
                             let result = response.send();
                             match result {
-                                Ok(_) => {
-                                    // let _ = socket.flush();
-                                }
+                                Ok(_) => {}
                                 Err(why) => {
                                     warn!("size response error: {}", why)
                                 }
