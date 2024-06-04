@@ -26,7 +26,7 @@ impl Canvas {
     pub fn set_pixel(&mut self, x: u16, y: u16, color: Color) {
         let x = x as usize;
         let y = y as usize;
-        if x > self.width as usize || y > self.height as usize {
+        if x >= self.width as usize || y >= self.height as usize {
             return;
         }
         let pixel_pos = (x + y * self.width as usize) * COLOR_SIZE;

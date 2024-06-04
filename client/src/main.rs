@@ -49,6 +49,8 @@ fn send_pixel_from_image(
     has_transparency: bool,
     x: u16,
     y: u16,
+    offset_x: u16,
+    offset_y: u16,
 ) -> Result<()> {
     let pixel = image.get_pixel(x.into(), y.into());
     let color = if has_transparency {
@@ -57,7 +59,7 @@ fn send_pixel_from_image(
         Color::from_rgb(pixel.to_rgb().0)
     };
 
-    set_pixel(target, x, y, color)?;
+    set_pixel(target, x + offset_x, y + offset_y, color)?;
     Ok(())
 }
 
@@ -81,8 +83,15 @@ fn main() -> Result<()> {
     loop {
         (0..(image.width() as u16)).into_par_iter().for_each(|x| {
             for y in 0..(image.height() as u16) {
-                let result =
-                    send_pixel_from_image(&image, arguments.target, has_transparency, x, y);
+                let result = send_pixel_from_image(
+                    &image,
+                    arguments.target,
+                    has_transparency,
+                    x,
+                    y,
+                    arguments.x,
+                    arguments.y,
+                );
                 if let Err(err) = result {
                     eprintln!("error while sending pixel: {:?}", err);
                 }
