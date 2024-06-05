@@ -92,3 +92,9 @@ The set pixel packet has no response.
 - Servers SHOULD silently discard pixel setting requests that fall outside the defined canvas. They MAY wrap pixel setting requests at the image borders (`x mod width` and `y mod height`).
 - Since many systems can’t prevent default responses from ICMP Echo Request packets, any packet type that is invalid for its direction MUST be discarded by either side and not treated as an error.
 - Any other kind of generally malformatted data MUST be discarded silently. Clients SHOULD warn the user about such events, for example to aid in debugging server implementations and raising issues with servers run at large events.
+
+### Practical considerations
+
+- Some network stacks may be ill-equipped to handle large amounts of ICMP packets. The Windows network stack has in testing shown to be one such example. Extra care needs to be taken when using such systems as part of a network that handles pingxelflut traffic.
+- ICMP has no congestion control. Since clients can’t automatically decrease their sending rate, it is therefore recommended to silently drop ICMP packets in routers when the bandwidth limit is reached.
+- ICMP cannot address applications, and on most operating systems any application receiving ICMP packets will recieve all ICMP packets sent to its machine (or at least to a specific link). While this does not limit the protocol itself (the only response message applies to all clients equally and may be read by anyone, even those that did not request it), it is therefore challenging to either run multiple clients on one machine, or to run a client on the same machine as a server. Additionally, running multiple distinct servers on one machine under one target IP address is not possible, but running a subordinate server that passively reads out pixel commands targeted at a main server may be useful.
