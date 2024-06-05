@@ -8,3 +8,4 @@ edition.workspace = true
 
 [dependencies]
 socket2 = { version = "0.5.7", features = ["all"] }
+async-channel = "2.3.1"

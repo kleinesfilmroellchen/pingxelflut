@@ -21,7 +21,7 @@ The client has a few options controlling how and where to send images, see its `
 
 ### `server`
 
-The server does not have any options currently. It opens a window displaying the pingxelflut canvas; closing the window ends the application. It uses `libpcap` to detect ICMP packets, so the corresponding libraries must be installed; refer to your package manager of choice or install `Npcap` on Windows. The server needs the raw socket capabilities in addition to pcap permissions, so `cap_net_raw,cap_net_admin` seems to be required for Linux capabilities. (It doesn’t seem to be possible to run the server as root due to it interacting with the windowing system.)
+The server does not have any options currently. It opens a window displaying the pingxelflut canvas; closing the window ends the application. The server also needs raw socket capabilities, so `cap_net_raw` seems to be required for Linux capabilities. (It doesn’t seem to be possible to run the server as root due to it interacting with the windowing system.)
 
 > ![NOTE]
 > The server is not tested on Windows.
@@ -30,7 +30,7 @@ For development, this command chain seems to be useful:
 
 ```shell
 # in the `server` directory
-cargo build --release && sudo setcap cap_net_raw,cap_net_admin=eip ../target/release/server && ../target/release/server
+cargo build --release && sudo setcap cap_net_raw=eip ../target/release/server && ../target/release/server
 ```
 
 ## Known Implementations

@@ -166,3 +166,56 @@ pub(crate) fn read_first_icmp_packet_with_type(
         buffer.starts_with(&[ECHO_REPLY_V4, 0]) && buffer.get(8).is_some_and(|v| *v == receive_type)
     })
 }
+
+/// There’s no working async raw socket implementation for Rust at the moment, and I don’t want to implement a “real” one just for this.
+/// Instead, run blocking reads on an additional thread and forward data through an async channel to the async workers.
+pub struct IcmpListener {
+    socket: Socket,
+    send_queue: async_channel::Sender<Vec<u8>>,
+    pub receive_queue: async_channel::Receiver<Vec<u8>>,
+}
+
+impl IcmpListener {
+    pub fn new(is_ipv4: bool) -> Result<IcmpListener, io::Error> {
+        let socket = if is_ipv4 {
+            Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::ICMPV4))?
+        } else {
+            Socket::new(Domain::IPV6, Type::RAW, Some(Protocol::ICMPV6))?
+        };
+        socket.set_nonblocking(false)?;
+        Ok(Self::new_from_socket(socket))
+    }
+
+    pub fn new_from_socket(socket: Socket) -> Self {
+        let (send_queue, receive_queue) = async_channel::unbounded();
+        Self {
+            socket,
+            send_queue,
+            receive_queue,
+        }
+    }
+
+    /// Reads data from the socket in an infinite loop.
+    pub fn run(&mut self) {
+        let mut buffer = [0; 2048];
+        loop {
+            let result = self.socket.read(&mut buffer);
+            match result {
+                Err(why) => match why.kind() {
+                    // socket closed, time to stop
+                    ErrorKind::UnexpectedEof | ErrorKind::BrokenPipe => {
+                        return;
+                    }
+                    _ => {}
+                },
+                Ok(size) => {
+                    let received_data = buffer[..size].to_owned();
+                    let send_result = self.send_queue.send_blocking(received_data);
+                    if send_result.is_err() {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}
