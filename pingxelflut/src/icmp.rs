@@ -1,3 +1,4 @@
+use etherparse::{Icmpv6Slice, SlicedPacket, TransportSlice};
 use socket2::{Domain, Protocol, Socket, Type};
 use std::{
     io::{self, ErrorKind, Read},
@@ -59,6 +60,9 @@ impl Icmp {
         self.payload = payload;
     }
 
+    /// lowest priority DSCP
+    const DSCP_LOW_PRIORITY: u32 = 8 << 2;
+
     /// Send this ICMP packet.
     /// Apart from the send action this has the additional effect of incrementing the sequence number of this packet.
     ///
@@ -70,6 +74,11 @@ impl Icmp {
         } else {
             Socket::new(Domain::IPV6, Type::RAW, Some(Protocol::ICMPV6))?
         };
+        if self.target.is_ipv4() {
+            socket.set_tos(Self::DSCP_LOW_PRIORITY)?;
+        } else {
+            socket.set_tclass_v6(Self::DSCP_LOW_PRIORITY)?;
+        }
 
         socket.send_to(&self.packet, &self.target.into())?;
 
@@ -143,12 +152,25 @@ pub(crate) fn read_icmp_packets_until(
                 _ => return Err(why),
             },
             Ok(size) => {
-                // FIXME: only works on IPv4
-                last_packet.resize(size - IPV4_HEADER_SIZE, 0);
-                last_packet.copy_from_slice(&buffer[IPV4_HEADER_SIZE..size]);
-                println!("packet {:?}", last_packet);
-                if condition(&last_packet) {
-                    break;
+                if socket.local_addr().unwrap().is_ipv4() {
+                    let ip_packet = SlicedPacket::from_ip(&buffer[..size])
+                        .map_err(|_| io::Error::other("unknown packet type"))?;
+                    match ip_packet.transport {
+                        Some(TransportSlice::Icmpv4(icmp)) => {
+                            if condition(icmp.payload()) {
+                                last_packet = icmp.payload().to_owned();
+                                break;
+                            }
+                        }
+                        _ => continue,
+                    }
+                } else {
+                    let icmp = Icmpv6Slice::from_slice(&buffer[..size])
+                        .map_err(|_| io::Error::other("unknown packet type"))?;
+                    if condition(icmp.payload()) {
+                        last_packet = icmp.payload().to_owned();
+                        break;
+                    }
                 }
             }
         }
@@ -163,7 +185,8 @@ pub(crate) fn read_first_icmp_packet_with_type(
 ) -> Result<Vec<u8>, io::Error> {
     // FIXME: use etherparse to more robustly read the packet type.
     read_icmp_packets_until(socket, |buffer| {
-        buffer.starts_with(&[ECHO_REPLY_V4, 0]) && buffer.get(8).is_some_and(|v| *v == receive_type)
+        (buffer.starts_with(&[ECHO_REPLY_V4, 0]) || buffer.starts_with(&[ECHO_REPLY_V6]))
+            && buffer.get(8).is_some_and(|v| *v == receive_type)
     })
 }
 
@@ -182,6 +205,12 @@ impl IcmpListener {
         } else {
             Socket::new(Domain::IPV6, Type::RAW, Some(Protocol::ICMPV6))?
         };
+        // set low priority
+        if is_ipv4 {
+            socket.set_tos(Icmp::DSCP_LOW_PRIORITY)?;
+        } else {
+            socket.set_tclass_v6(Icmp::DSCP_LOW_PRIORITY)?;
+        }
         socket.set_nonblocking(false)?;
         Ok(Self::new_from_socket(socket))
     }

@@ -45,6 +45,8 @@ The pingxelflut protocol is a layer 5 protocol based on [ICMP (RFC 792)](https:/
 
 Messages to the server are sent as Echo Request packets (ICMP type 8 code 0, ICMPv6 type 128), messages to the client are sent as Echo Reply (ICMP type 0 code 0, ICMPv6 type 129).
 
+Clients SHOULD use lowest-priority QoS (DSCP CS1, value 8) in the IP Traffic Class header. Servers SHOULD drop packets that do not conform to this lowest traffic class, and clients SHOULD expect that any server will do so. 
+
 The first four bytes of the payload are to be used according to Echo conventions. The first 16-bit word specifies the Echo request identifier, and the second 16-bit word specifies the Echo request sequence number. The identifier MUST be ignored. The sequence number of consecutive packets SHOULD be increasing.
 
 The fifth byte of the payload specifies the packet type.
