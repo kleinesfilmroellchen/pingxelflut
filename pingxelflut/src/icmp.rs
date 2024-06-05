@@ -171,8 +171,8 @@ pub(crate) fn read_first_icmp_packet_with_type(
 /// Instead, run blocking reads on an additional thread and forward data through an async channel to the async workers.
 pub struct IcmpListener {
     socket: Socket,
-    send_queue: async_channel::Sender<Vec<u8>>,
-    pub receive_queue: async_channel::Receiver<Vec<u8>>,
+    send_queue: async_channel::Sender<(Vec<u8>, SocketAddr)>,
+    pub receive_queue: async_channel::Receiver<(Vec<u8>, SocketAddr)>,
 }
 
 impl IcmpListener {
@@ -199,7 +199,9 @@ impl IcmpListener {
     pub fn run(&mut self) {
         let mut buffer = [0; 2048];
         loop {
-            let result = self.socket.read(&mut buffer);
+            let result = self
+                .socket
+                .recv_from(unsafe { std::mem::transmute(buffer.as_mut_slice()) });
             match result {
                 Err(why) => match why.kind() {
                     // socket closed, time to stop
@@ -208,9 +210,12 @@ impl IcmpListener {
                     }
                     _ => {}
                 },
-                Ok(size) => {
+                Ok((size, address)) => {
                     let received_data = buffer[..size].to_owned();
-                    let send_result = self.send_queue.send_blocking(received_data);
+                    let send_result = self.send_queue.send_blocking((
+                        received_data,
+                        address.as_socket().expect("only ip sockets are supported"),
+                    ));
                     if send_result.is_err() {
                         return;
                     }

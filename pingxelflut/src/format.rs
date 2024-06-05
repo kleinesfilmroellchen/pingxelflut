@@ -20,7 +20,7 @@ impl Packet {
 
     /// Parse a packet from the start of the provided binary representation.
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        let kind = bytes[0];
+        let kind = bytes.first()?;
         match kind {
             0xaa => Some(Self::SizeRequest),
             0xbb => {

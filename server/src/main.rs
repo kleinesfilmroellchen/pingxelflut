@@ -12,7 +12,7 @@ use std::{
 
 use anyhow::Result;
 use canvas::{to_internal_color, Canvas};
-use etherparse::{Icmpv4Type, Icmpv6Type, NetSlice, SlicedPacket, TransportSlice};
+use etherparse::{Icmpv4Type, Icmpv6Slice, Icmpv6Type, SlicedPacket, TransportSlice};
 use futures::{Future, StreamExt};
 use log::{error, warn};
 use pingxelflut::{
@@ -35,19 +35,20 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Extract the IP source address from a parsed network layer packet.
-/// Works for both IP versions.
-fn ip_addr_from_net_packet(packet: &NetSlice) -> IpAddr {
-    match packet {
-        NetSlice::Ipv4(ip_packet) => ip_packet.header().source_addr().into(),
-        NetSlice::Ipv6(ip_packet) => ip_packet.header().source_addr().into(),
-    }
-}
-
-fn decode_pingxelflut_packet(raw_packet: Vec<u8>) -> Option<(Packet, IpAddr)> {
-    let parsed_packet = SlicedPacket::from_ip(&raw_packet).ok()?;
-    let transport_packet = parsed_packet.transport?;
-    let destination_address = ip_addr_from_net_packet(&parsed_packet.net?);
+fn decode_pingxelflut_packet(
+    raw_packet: Vec<u8>,
+    address: SocketAddr,
+    is_ipv4: bool,
+) -> Option<(Packet, IpAddr)> {
+    // For some reason, under IPv4 we get an IP packet, while under IPv6 we get the ICMPv6 packet directly.
+    // FIXME: this means we don’t know who sent the IPv6 packet! We just send the response to localhost.
+    let transport_packet = if is_ipv4 {
+        let parsed_packet = SlicedPacket::from_ip(&raw_packet).ok()?;
+        parsed_packet.transport?
+    } else {
+        let icmpv6 = Icmpv6Slice::from_slice(&raw_packet).ok()?;
+        TransportSlice::Icmpv6(icmpv6)
+    };
 
     match transport_packet {
         TransportSlice::Icmpv4(data) => {
@@ -55,7 +56,7 @@ fn decode_pingxelflut_packet(raw_packet: Vec<u8>) -> Option<(Packet, IpAddr)> {
             let packet_type = data.icmp_type();
             match packet_type {
                 Icmpv4Type::EchoRequest(_) => {
-                    Packet::from_bytes(payload).map(|p| (p, destination_address))
+                    Packet::from_bytes(payload).map(|p| (p, address.ip()))
                 }
                 _ => None,
             }
@@ -65,7 +66,7 @@ fn decode_pingxelflut_packet(raw_packet: Vec<u8>) -> Option<(Packet, IpAddr)> {
             let packet_type = data.icmp_type();
             match packet_type {
                 Icmpv6Type::EchoRequest(_) => {
-                    Packet::from_bytes(payload).map(|p| (p, destination_address))
+                    Packet::from_bytes(payload).map(|p| (p, address.ip()))
                 }
                 _ => None,
             }
@@ -80,7 +81,9 @@ async fn ip_ping_handler(canvas: Canvas, is_ipv4: bool) -> Result<()> {
 
     thread::spawn(move || icmp4_listener.run());
 
-    let stream = receive_queue.filter_map(|x| futures::future::ready(decode_pingxelflut_packet(x)));
+    let stream = receive_queue.filter_map(|(data, addr)| {
+        futures::future::ready(decode_pingxelflut_packet(data, addr, is_ipv4))
+    });
 
     stream
         .for_each(move |(packet, target_addr)| {
