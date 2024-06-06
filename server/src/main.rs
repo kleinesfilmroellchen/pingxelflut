@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
 }
 
 fn decode_pingxelflut_packet(
-    raw_packet: Vec<u8>,
+    raw_packet: &[u8],
     address: SocketAddr,
     is_ipv4: bool,
 ) -> Option<(Packet, IpAddr)> {
@@ -82,7 +82,7 @@ async fn ip_ping_handler(canvas: Canvas, is_ipv4: bool) -> Result<()> {
     thread::spawn(move || icmp4_listener.run());
 
     let stream = receive_queue.filter_map(|(data, addr)| {
-        futures::future::ready(decode_pingxelflut_packet(data, addr, is_ipv4))
+        futures::future::ready(decode_pingxelflut_packet(&data, addr, is_ipv4))
     });
 
     stream
