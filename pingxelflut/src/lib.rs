@@ -23,7 +23,7 @@ pub fn get_size(target: IpAddr) -> Result<(u16, u16), io::Error> {
     size_request.set_payload(Packet::SizeRequest.to_bytes());
     let mut socket = size_request.send()?;
     let raw_response = read_first_icmp_packet_with_type(&mut socket, Packet::SIZE_RESPONSE_ID)?;
-    let response = Packet::from_bytes(&raw_response[8..]);
+    let response = Packet::from_bytes(&raw_response);
     match response {
         Some(Packet::SizeResponse { width, height }) => Ok((width, height)),
         Some(Packet::SizeRequest) => Err(io::Error::other("size request returned verbatim")),

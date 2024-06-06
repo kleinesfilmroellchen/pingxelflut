@@ -158,7 +158,7 @@ pub(crate) fn read_icmp_packets_until(
                     match ip_packet.transport {
                         Some(TransportSlice::Icmpv4(icmp)) => {
                             if condition(icmp.payload()) {
-                                last_packet = icmp.payload().to_owned();
+                                icmp.payload().clone_into(&mut last_packet);
                                 break;
                             }
                         }
@@ -168,7 +168,7 @@ pub(crate) fn read_icmp_packets_until(
                     let icmp = Icmpv6Slice::from_slice(&buffer[..size])
                         .map_err(|_| io::Error::other("unknown packet type"))?;
                     if condition(icmp.payload()) {
-                        last_packet = icmp.payload().to_owned();
+                        icmp.payload().clone_into(&mut last_packet);
                         break;
                     }
                 }
@@ -185,8 +185,7 @@ pub(crate) fn read_first_icmp_packet_with_type(
 ) -> Result<Vec<u8>, io::Error> {
     // FIXME: use etherparse to more robustly read the packet type.
     read_icmp_packets_until(socket, |buffer| {
-        (buffer.starts_with(&[ECHO_REPLY_V4, 0]) || buffer.starts_with(&[ECHO_REPLY_V6]))
-            && buffer.get(8).is_some_and(|v| *v == receive_type)
+        buffer.first().is_some_and(|v| *v == receive_type)
     })
 }
 
