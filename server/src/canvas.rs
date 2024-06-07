@@ -49,7 +49,22 @@ impl Canvas {
         let frame = pixels.frame_mut();
         while let Ok((pixel_pos, color)) = self.pixel_queue_out.try_recv() {
             let pixel_end_pos = pixel_pos + COLOR_SIZE;
-            frame[pixel_pos..pixel_end_pos].copy_from_slice(color.as_slice());
+            let new_color = if color.a == 0xff {
+                color
+            } else {
+                let current_color_data: [u8; 4] =
+                    frame[pixel_pos..pixel_end_pos].try_into().unwrap();
+                let current_color: Color = Color::from(current_color_data);
+                alpha_multiply(color, current_color)
+            };
+            frame[pixel_pos..pixel_end_pos].copy_from_slice(new_color.as_slice());
         }
     }
+}
+
+pub fn alpha_multiply(a: Color, b: Color) -> Color {
+    let alpha_out = a.a + b.a * (0xff - a.a);
+    let mut color_out = (a * a.a + b * b.a * (0xff - a.a)) / alpha_out;
+    color_out.a = alpha_out;
+    color_out
 }
