@@ -1,3 +1,7 @@
+//! ICMP send and receive tooling.
+//!
+//! This module is only available in std environments.
+
 use etherparse::{Icmpv6Slice, SlicedPacket, TransportSlice};
 use socket2::{Domain, Protocol, Socket, Type};
 use std::{

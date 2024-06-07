@@ -7,6 +7,10 @@ rust-version.workspace = true
 edition.workspace = true
 
 [dependencies]
-socket2 = { version = "0.5.7", features = ["all"] }
-async-channel = "2.3.1"
-etherparse = "0.15.0"
+socket2 = { version = "0.5.7", features = ["all"], optional = true }
+async-channel = { version = "2.3.1", default-features = false }
+etherparse = { version = "0.15.0", default-features = false }
+
+[features]
+default = ["std"]
+std = ["dep:socket2", "async-channel/std", "etherparse/std"]

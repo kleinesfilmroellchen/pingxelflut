@@ -39,37 +39,34 @@ impl Packet {
     }
 
     /// Write the packet data to the start of a provided buffer.
-    /// Returns the number of written bytes.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the provided buffer is not large enough.
-    pub fn write_to(&self, buffer: &mut [u8]) -> usize {
-        match self {
+    /// Returns the number of written bytes, or None if the buffer wasn’t large enough.
+    pub fn write_to(&self, buffer: &mut [u8]) -> Option<usize> {
+        Some(match self {
             Packet::SizeRequest => {
-                buffer[0] = Self::SIZE_REQUEST_ID;
+                buffer.get_mut(0).map(|x| *x = Self::SIZE_REQUEST_ID)?;
                 1
             }
             Packet::SizeResponse { width, height } => {
-                buffer[0] = Self::SIZE_RESPONSE_ID;
-                buffer[1..=2].copy_from_slice(&width.to_be_bytes());
-                buffer[3..=4].copy_from_slice(&height.to_be_bytes());
+                buffer.get_mut(0).map(|x| *x = Self::SIZE_RESPONSE_ID)?;
+                buffer.get_mut(1..=2).map(|x| x.copy_from_slice(&width.to_be_bytes()))?;
+                buffer.get_mut(3..=4).map(|x| x.copy_from_slice(&height.to_be_bytes()))?;
                 5
             }
             Packet::SetPixel { x, y, color } => {
-                buffer[0] = Self::SET_PIXEL_ID;
-                buffer[1..=2].copy_from_slice(&x.to_be_bytes());
-                buffer[3..=4].copy_from_slice(&y.to_be_bytes());
-                let color_size = color.write_to(&mut buffer[5..]);
+                buffer.get_mut(0).map(|x| *x = Self::SET_PIXEL_ID)?;
+                buffer.get_mut(1..=2).map(|val| val.copy_from_slice(&x.to_be_bytes()))?;
+                buffer.get_mut(3..=4).map(|x| x.copy_from_slice(&y.to_be_bytes()))?;
+                let color_size = color.write_to(buffer.get_mut(5..)?);
                 5 + color_size
             }
-        }
+        })
     }
 
     /// Convert the packet to its byte representation.
+    #[cfg(feature = "std")]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buffer = vec![0; 9];
-        let length = self.write_to(&mut buffer);
+        let length = self.write_to(&mut buffer).unwrap();
         buffer.truncate(length);
         buffer
     }
@@ -140,15 +137,14 @@ impl Color {
     /// Write the color data to the start of a provided buffer.
     /// Returns the number of written bytes.
     ///
-    /// # Panics
-    ///
-    /// Panics if the provided buffer is not large enough.
+    /// This function will stop writing anything if the buffer is not large enough.
+    /// It will still return the number of bytes that would have been written in theory.
     pub fn write_to(&self, buffer: &mut [u8]) -> usize {
-        buffer[0] = self.red;
-        buffer[1] = self.green;
-        buffer[2] = self.blue;
+        buffer.get_mut(0).map(|x| *x = self.red);
+        buffer.get_mut(1).map(|x| *x = self.green);
+        buffer.get_mut(2).map(|x| *x = self.blue);
         if let Some(alpha) = self.alpha {
-            buffer[3] = alpha;
+            buffer.get_mut(3).map(|x| *x = alpha);
             4
         } else {
             3
@@ -156,6 +152,7 @@ impl Color {
     }
 
     /// Convert the color to its byte representation.
+    #[cfg(feature = "std")]
     pub fn to_bytes(self) -> Vec<u8> {
         let mut buffer = vec![self.red, self.green, self.blue];
         if let Some(alpha) = self.alpha {
