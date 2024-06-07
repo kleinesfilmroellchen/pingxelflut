@@ -11,7 +11,7 @@ use std::{
 };
 
 use anyhow::Result;
-use canvas::{to_internal_color, Canvas};
+use canvas::Canvas;
 use etherparse::{Icmpv4Type, Icmpv6Slice, Icmpv6Type, SlicedPacket, TransportSlice};
 use futures::{Future, StreamExt};
 use log::{error, warn};
@@ -43,10 +43,10 @@ fn decode_pingxelflut_packet(
     // For some reason, under IPv4 we get an IP packet, while under IPv6 we get the ICMPv6 packet directly.
     // FIXME: this means we don’t know who sent the IPv6 packet! We just send the response to localhost.
     let transport_packet = if is_ipv4 {
-        let parsed_packet = SlicedPacket::from_ip(&raw_packet).ok()?;
+        let parsed_packet = SlicedPacket::from_ip(raw_packet).ok()?;
         parsed_packet.transport?
     } else {
-        let icmpv6 = Icmpv6Slice::from_slice(&raw_packet).ok()?;
+        let icmpv6 = Icmpv6Slice::from_slice(raw_packet).ok()?;
         TransportSlice::Icmpv6(icmpv6)
     };
 
@@ -112,7 +112,7 @@ async fn ip_ping_handler(canvas: Canvas, is_ipv4: bool) -> Result<()> {
                     // ignore
                     Packet::SizeResponse { .. } => {}
                     Packet::SetPixel { x, y, color } => {
-                        canvas.set_pixel(x, y, to_internal_color(color));
+                        canvas.set_pixel(x, y, color);
                     }
                 }
             });
