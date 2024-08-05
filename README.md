@@ -35,7 +35,8 @@ cargo build --release && sudo setcap cap_net_raw=eip ../target/release/server &&
 
 ## Known Implementations
 
-[pyngxelflut](https://codeberg.org/lilaura/pyngxelflut) - A simple but slooooooow (IPv6 only) implementation in Python, mostly there for me to learn more about ICMP(v6
+* [pyngxelflut](https://codeberg.org/lilaura/pyngxelflut) - A simple but slooooooow (IPv6 only) client implementation in Python, mostly there for me to learn more about ICMP(v6
+* [pixelflut-v6](https://github.com/sbernauer/pixelflut-v6) - A very fast server and client implementation using DPDK. It supports the [pixelflut-v6](https://entropia.de/GPN17:Pingxelflut) protocol as well as the here described pingxelflut protocol.
 
 Please open a PR to add your implementation!
 
